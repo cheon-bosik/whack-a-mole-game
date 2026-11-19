@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>두더지 잡기</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: #bfe8a8;
+    font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    user-select: none;
+    touch-action: manipulation;
+  }
+  h1 { margin: 0; font-size: clamp(26px, 5vw, 40px); color: #3b2a14; }
+  .info {
+    display: flex;
+    gap: 14px;
+    font-size: clamp(20px, 4vw, 30px);
+    font-weight: bold;
+    color: #3b2a14;
+  }
+  .info div {
+    background: #fff8e1;
+    border-radius: 14px;
+    padding: 8px 22px;
+    min-width: 130px;
+    text-align: center;
+  }
+  .board {
+    position: relative;
+    width: min(94vw, 62vh, 560px);
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    padding: 12px;
+    background: #8fcf6f;
+    border-radius: 24px;
+  }
+  .hole {
+    position: relative;
+    aspect-ratio: 1 / 1;
+    border-radius: 22px;
+    overflow: hidden;
+    background: radial-gradient(ellipse at 50% 100%, #2b1a0a 0 38%, #6b4423 39% 100%);
+  }
+  .mole {
+    position: absolute;
+    left: 8%;
+    bottom: 0;
+    width: 84%;
+    height: 84%;
+    border-radius: 50%;
+    background: #a0693a;
+    border: 4px solid #5a3515;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: clamp(30px, 9vw, 64px);
+    font-weight: bold;
+    color: #2b1a0a;
+    line-height: 1;
+    transform: translateY(115%);
+    transition: transform 0.12s ease-out;
+    cursor: pointer;
+  }
+  .mole.up { transform: translateY(0); }
+  .mole.hit { background: #f2a65a; border-color: #c4571a; }
+  .overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(40, 25, 10, 0.88);
+    border-radius: 24px;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    color: #fff;
+    text-align: center;
+    z-index: 5;
+  }
+  .overlay.show { display: flex; }
+  .overlay .label { font-size: clamp(22px, 5vw, 32px); }
+  .overlay .final { font-size: clamp(80px, 22vw, 150px); font-weight: bold; color: #ffd54f; line-height: 1; }
+  button {
+    font-family: inherit;
+    font-size: clamp(20px, 4.5vw, 28px);
+    font-weight: bold;
+    padding: 14px 36px;
+    border: none;
+    border-radius: 16px;
+    background: #ff8a3d;
+    color: #fff;
+    cursor: pointer;
+  }
+  button:active { transform: scale(0.96); }
+</style>
+</head>
+<body>
+  <h1>🔨 두더지 잡기</h1>
+  <div class="info">
+    <div>점수 <span id="score">0</span></div>
+    <div>시간 <span id="time">30</span></div>
+  </div>
+
+  <div class="board" id="board">
+    <div class="overlay" id="overlay">
+      <div class="label">게임 끝!</div>
+      <div class="final" id="final">0</div>
+      <div class="label">점</div>
+    </div>
+  </div>
+
+  <button id="restart">다시 시작</button>
+
+<script>
+  var TOTAL_TIME = 30;
+  var board = document.getElementById("board");
+  var scoreEl = document.getElementById("score");
+  var timeEl = document.getElementById("time");
+  var overlay = document.getElementById("overlay");
+  var finalEl = document.getElementById("final");
+
+  var moles = [];
+  var score = 0;
+  var timeLeft = TOTAL_TIME;
+  var running = false;
+  var current = -1;
+  var whacked = false;
+  var clockTimer = null;
+  var hideTimer = null;
+  var nextTimer = null;
+
+  // 3 x 3 구멍과 두더지 만들기
+  for (var i = 0; i < 9; i++) {
+    var hole = document.createElement("div");
+    hole.className = "hole";
+    var mole = document.createElement("div");
+    mole.className = "mole";
+    mole.textContent = "• ᴥ •";
+    (function (idx) {
+      mole.addEventListener("pointerdown", function (e) {
+        e.preventDefault();
+        hit(idx);
+      });
+    })(i);
+    hole.appendChild(mole);
+    board.appendChild(hole);
+    moles.push(mole);
+  }
+
+  function hideMole(idx) {
+    if (idx < 0) return;
+    moles[idx].classList.remove("up", "hit");
+    moles[idx].textContent = "• ᴥ •";
+  }
+
+  function popUp() {
+    if (!running) return;
+    var idx;
+    do {
+      idx = Math.floor(Math.random() * 9);
+    } while (idx === current);
+    current = idx;
+    whacked = false;
+    moles[idx].classList.add("up");
+    var stay = 700 + Math.random() * 500;
+    hideTimer = setTimeout(function () {
+      hideMole(idx);
+      nextTimer = setTimeout(popUp, 250);
+    }, stay);
+  }
+
+  function hit(idx) {
+    if (!running || idx !== current || whacked) return;
+    whacked = true;
+    score++;
+    scoreEl.textContent = score;
+    moles[idx].classList.add("hit");
+    moles[idx].textContent = "> ᴥ <";
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(function () {
+      hideMole(idx);
+      nextTimer = setTimeout(popUp, 250);
+    }, 250);
+  }
+
+  function endGame() {
+    running = false;
+    clearInterval(clockTimer);
+    clearTimeout(hideTimer);
+    clearTimeout(nextTimer);
+    hideMole(current);
+    finalEl.textContent = score;
+    overlay.classList.add("show");
+  }
+
+  function startGame() {
+    clearInterval(clockTimer);
+    clearTimeout(hideTimer);
+    clearTimeout(nextTimer);
+    hideMole(current);
+    current = -1;
+    score = 0;
+    timeLeft = TOTAL_TIME;
+    scoreEl.textContent = score;
+    timeEl.textContent = timeLeft;
+    overlay.classList.remove("show");
+    running = true;
+    clockTimer = setInterval(function () {
+      timeLeft--;
+      timeEl.textContent = timeLeft;
+      if (timeLeft <= 0) endGame();
+    }, 1000);
+    nextTimer = setTimeout(popUp, 400);
+  }
+
+  document.getElementById("restart").addEventListener("click", startGame);
+  startGame();
+</script>
+</body>
+</html>
